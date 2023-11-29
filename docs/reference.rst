@@ -1,10 +1,10 @@
 Reference
 =========
 
-door.utilities module
+door.doors module
 ---------------------
 
-.. automodule:: door.utilities
+.. automodule:: door.doors
    :members:
    :undoc-members:
    :show-inheritance:
@@ -37,6 +37,14 @@ door.threading2 module
 ----------------------
 
 .. automodule:: door.threading2
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+door.utilities module
+---------------------
+
+.. automodule:: door.utilities
    :members:
    :undoc-members:
    :show-inheritance:

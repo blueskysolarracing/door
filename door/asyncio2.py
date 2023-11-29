@@ -1,9 +1,9 @@
-""":mod:`door.asyncio` defines utilities for asynchronous programming."""
+""":mod:`door.asyncio2` defines utilities for asynchronous programming."""
 
 from asyncio import Lock
 from dataclasses import dataclass, field
 
-from door.primitives import AsyncPrimitive, AsyncSLock
+from door.primitives import Acquirable, AsyncSLock
 
 
 @dataclass
@@ -17,5 +17,5 @@ class SLock(AsyncSLock):
     and Foundations by Michel Raynal.
     """
 
-    _r: AsyncPrimitive = field(default_factory=Lock, init=False)
-    _g: AsyncPrimitive = field(default_factory=Lock, init=False)
+    _r: Acquirable = field(default_factory=Lock, init=False)
+    _g: Acquirable = field(default_factory=Lock, init=False)

@@ -25,8 +25,7 @@ When making changes, please follow these guidelines:
   `PEP8 <https://peps.python.org/pep-0008/>`_.
 - Write unit tests for your changes, and make sure all tests pass before
   submitting a pull request.
-- Document your changes in the code and update the `README <README.rst>`_ file
-  if necessary.
+- Document your changes in the code and update the README file if necessary.
 - After making changes, please validate your changes.
 
 1. Run static type checking with ``--strict`` flag: ``mypy --strict door``

@@ -8,8 +8,9 @@ The implementations in this library follow the pseudocode in Concurrent
 Programming: Algorithms, Principles, and Foundations by Michel Raynal.
 
 The usual acquire/release interface as modelled by
-:class:`door.primitives.Primitive` is not sufficient to describe the
-functionalities of shared locks. Therefore, we expand the interface as follows:
+:class:`door.primitives.Acquirable` is not sufficient to describe the
+functionalities of shared locks. Therefore, for
+:class:`door.primitives.Waitable`, we expand the interface as follows:
 
 - acquire-read
 - release-read

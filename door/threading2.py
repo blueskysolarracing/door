@@ -1,9 +1,9 @@
-""":mod:`door.threading` defines utilities for multithreading."""
+""":mod:`door.threading2` defines utilities for multithreading."""
 
 from dataclasses import dataclass, field
 from threading import RLock
 
-from door.primitives import Primitive, SLock as SyncSLock
+from door.primitives import Acquirable, SLock as SyncSLock
 
 
 @dataclass
@@ -17,5 +17,5 @@ class SLock(SyncSLock):
     and Foundations by Michel Raynal.
     """
 
-    _r: Primitive = field(default_factory=RLock, init=False)
-    _g: Primitive = field(default_factory=RLock, init=False)
+    _r: Acquirable = field(default_factory=RLock, init=False)
+    _g: Acquirable = field(default_factory=RLock, init=False)

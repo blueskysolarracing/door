@@ -1,110 +1,64 @@
-""":mod:`door.primitives` defines the primitive protocols."""
+""":mod:`door.primitives` defines the primitives."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
+
+from door.utilities import await_if_awaitable
 
 
 @runtime_checkable
-class Primitive(Protocol):
-    """A protocol for primitives."""
+class Acquirable(Protocol):
+    """A protocol for acquirable primitives."""
 
-    def acquire(self) -> bool:
-        """Acquire the primitive.
-
-        :return: ``True`` if acquired, otherwise ``False``.
-        """
+    def acquire(self) -> Any:
+        """Acquire the primitive."""
         pass  # pragma: no cover
 
-    def release(self) -> None:
-        """Release the primitive.
-
-        :return: ``None``.
-        """
+    def release(self) -> Any:
+        """Release the primitive. """
         pass  # pragma: no cover
 
 
 @runtime_checkable
-class AsyncPrimitive(Protocol):
-    """A protocol for asynchronous primitives."""
+class Waitable(Acquirable, Protocol):
+    """A protocol for acquirable primitives."""
 
-    async def acquire(self) -> bool:
-        """Acquire the primitive.
-
-        :return: ``True`` if acquired, otherwise ``False``.
-        """
+    def wait(self) -> Any:
+        """Wait."""
         pass  # pragma: no cover
 
-    def release(self) -> None:
-        """Release the primitive.
-
-        :return: ``None``.
-        """
+    def wait_for(self, predicate: Callable[[], bool]) -> Any:
+        """Wait."""
         pass  # pragma: no cover
 
-
-@runtime_checkable
-class FineGrainedPrimitive(Protocol):
-    """A protocol for fine-grained primitives."""
-
-    def acquire_read(self) -> bool:
-        """Acquire the primitive for reading.
-
-        :return: ``True`` if acquired, otherwise ``False``.
-        """
+    def notify(self) -> Any:
+        """notify one."""
         pass  # pragma: no cover
 
-    def release_read(self) -> None:
-        """Release the primitive for reading.
-
-        :return: ``None``.
-        """
-        pass  # pragma: no cover
-
-    def acquire_write(self) -> bool:
-        """Acquire the primitive for writing (and reading).
-
-        :return: ``True`` if acquired, otherwise ``False``.
-        """
-        pass  # pragma: no cover
-
-    def release_write(self) -> None:
-        """Release the primitive for writing (and reading).
-
-        :return: ``None``.
-        """
+    def notify_all(self) -> Any:
+        """notify all."""
         pass  # pragma: no cover
 
 
 @runtime_checkable
-class FineGrainedAsyncPrimitive(Protocol):
-    """A protocol for fine-grained asynchronous primitives."""
+class SAcquirable(Protocol):
+    """A protocol for shared primitives."""
 
-    async def acquire_read(self) -> bool:
-        """Acquire the primitive for reading.
-
-        :return: ``True`` if acquired, otherwise ``False``.
-        """
+    def acquire_read(self) -> Any:
+        """Acquire the primitive for reading."""
         pass  # pragma: no cover
 
-    async def release_read(self) -> None:
-        """Release the primitive for reading.
-
-        :return: ``None``.
-        """
+    def release_read(self) -> Any:
+        """Release the primitive for reading."""
         pass  # pragma: no cover
 
-    async def acquire_write(self) -> bool:
-        """Acquire the primitive for writing (and reading).
-
-        :return: ``True`` if acquired, otherwise ``False``.
-        """
+    def acquire_write(self) -> Any:
+        """Acquire the primitive for writing (and reading)."""
         pass  # pragma: no cover
 
-    async def release_write(self) -> None:
-        """Release the primitive for writing (and reading).
-
-        :return: ``None``.
-        """
+    def release_write(self) -> Any:
+        """Release the primitive for writing (and reading)."""
         pass  # pragma: no cover
 
 
@@ -117,8 +71,8 @@ class SLock:
     and Foundations by Michel Raynal.
     """
 
-    _r: Primitive
-    _g: Primitive
+    _r: Acquirable
+    _g: Acquirable
     _b: int = field(default=0, init=False)
 
     def acquire_read(self) -> bool:
@@ -163,36 +117,36 @@ class AsyncSLock:
     and Foundations by Michel Raynal.
     """
 
-    _r: AsyncPrimitive
-    _g: AsyncPrimitive
+    _r: Acquirable
+    _g: Acquirable
     _b: int = field(default=0, init=False)
 
     async def acquire_read(self) -> bool:
-        await self._r.acquire()
+        await await_if_awaitable(self._r.acquire())
 
         self._b += 1
 
         if self._b == 1:
-            await self._g.acquire()
+            await await_if_awaitable(self._g.acquire())
 
-        self._r.release()
+        await await_if_awaitable(self._r.release())
 
         return True
 
     async def release_read(self) -> None:
-        await self._r.acquire()
+        await await_if_awaitable(self._r.acquire())
 
         self._b -= 1
 
         if self._b == 0:
             self._g.release()
 
-        self._r.release()
+        await await_if_awaitable(self._r.release())
 
     async def acquire_write(self) -> bool:
-        await self._g.acquire()
+        await await_if_awaitable(self._g.acquire())
 
         return True
 
     async def release_write(self) -> None:
-        self._g.release()
+        await await_if_awaitable(self._g.release())

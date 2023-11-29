@@ -1,9 +1,9 @@
-""":mod:`door.multiprocessing` defines utilities for multiprocessing."""
+""":mod:`door.multiprocessing2` defines utilities for multiprocessing."""
 
 from dataclasses import dataclass, field
 from multiprocessing import RLock
 
-from door.primitives import Primitive, SLock as SyncSLock
+from door.primitives import Acquirable, SLock as SyncSLock
 
 
 @dataclass
@@ -17,5 +17,5 @@ class SLock(SyncSLock):
     and Foundations by Michel Raynal.
     """
 
-    _r: Primitive = field(default_factory=RLock, init=False)
-    _g: Primitive = field(default_factory=RLock, init=False)
+    _r: Acquirable = field(default_factory=RLock, init=False)
+    _g: Acquirable = field(default_factory=RLock, init=False)

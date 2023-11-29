@@ -1,51 +1,64 @@
 from asyncio import BoundedSemaphore, Condition, Lock, Semaphore
 from dataclasses import dataclass
+from typing import Any
 from unittest import IsolatedAsyncioTestCase, main
 
 from door.asyncio2 import SLock
-from door.primitives import AsyncPrimitive, FineGrainedAsyncPrimitive
-from door.utilities import AsyncDoor
+from door.primitives import Acquirable, SAcquirable
+from door.doors import AsyncAcquirableDoor, AsyncSAcquirableDoor
 
 
-class AsyncDoorTestCase(IsolatedAsyncioTestCase):
-    async def test_read_and_write(self) -> None:
+class AsyncTestCase(IsolatedAsyncioTestCase):
+    async def test_acquirable(self) -> None:
         @dataclass
-        class X:
-            a: str = 'a'
-            b: str = 'b'
+        class Resource:
+            key: Any = 'value'
 
         for primitive in (
                 Lock(),
                 Condition(),
                 Semaphore(),
                 BoundedSemaphore(),
+        ):
+            assert isinstance(primitive, Acquirable)
+
+            resource = Resource()
+            door = AsyncAcquirableDoor(resource, primitive)
+
+            async with door.acquire() as proxy:
+                self.assertEqual(proxy.key, 'value')
+                proxy.key = 'VALUE'
+                self.assertEqual(proxy.key, 'VALUE')
+
+            self.assertRaises(ValueError, getattr, proxy, 'key')
+            self.assertRaises(ValueError, setattr, proxy, 'key', 'value')
+            self.assertEqual(resource, Resource('VALUE'))
+
+    async def test_shared_acquirable(self) -> None:
+        @dataclass
+        class Resource:
+            key: Any = 'value'
+
+        for primitive in (
                 SLock(),
         ):
-            assert isinstance(
-                primitive,
-                AsyncPrimitive | FineGrainedAsyncPrimitive,
-            )
+            assert isinstance(primitive, SAcquirable)
 
-            x = X()
-            door = AsyncDoor(x, primitive)
+            resource = Resource()
+            door = AsyncSAcquirableDoor(resource, primitive)
 
-            async with door.read() as resource:
-                self.assertEqual(resource.a, 'a')
+            async with door.acquire_read() as proxy:
+                self.assertEqual(proxy.key, 'value')
+                self.assertRaises(ValueError, setattr, proxy, 'key', 'VALUE')
 
-            self.assertRaises(ValueError, getattr, resource, 'a')
-            self.assertRaises(ValueError, setattr, resource, 'a', 'A')
+            async with door.acquire_write() as proxy:
+                self.assertEqual(proxy.key, 'value')
+                proxy.key = 'VALUE'
+                self.assertEqual(proxy.key, 'VALUE')
 
-            async with door.read() as resource:
-                self.assertRaises(ValueError, setattr, resource, 'a', 'A')
-
-            async with door.write() as resource:
-                resource.b = 'B'
-                self.assertEqual(resource.b, 'B')
-                self.assertEqual(resource.a, 'a')
-                resource.a = 'A'
-                self.assertEqual(resource.a, 'A')
-
-            self.assertEqual(x, X('A', 'B'))
+            self.assertRaises(ValueError, getattr, proxy, 'key')
+            self.assertRaises(ValueError, setattr, proxy, 'key', 'value')
+            self.assertEqual(resource, Resource('VALUE'))
 
 
 if __name__ == '__main__':

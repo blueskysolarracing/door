@@ -1,3 +1,17 @@
-__all__ = 'AsyncDoor', 'Door', 'Resource'
+__all__ = (
+    'AcquirableDoor',
+    'AsyncAcquirableDoor',
+    'AsyncSAcquirableDoor',
+    'AsyncWaitableDoor',
+    'SAcquirableDoor',
+    'WaitableDoor',
+)
 
-from door.utilities import AsyncDoor, Door, Resource
+from door.doors import (
+    AcquirableDoor,
+    AsyncAcquirableDoor,
+    AsyncSAcquirableDoor,
+    AsyncWaitableDoor,
+    SAcquirableDoor,
+    WaitableDoor,
+)

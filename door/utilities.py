@@ -1,76 +1,67 @@
-from collections.abc import AsyncIterator, Iterator
-from contextlib import asynccontextmanager, closing, contextmanager
+""":mod:`door.utilities` defines the utilities."""
+
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from enum import auto, Flag
-from typing import Any, cast, Generic, TypeVar
-
-from door.primitives import (
-    AsyncPrimitive,
-    FineGrainedAsyncPrimitive,
-    FineGrainedPrimitive,
-    Primitive,
-)
+from functools import partial
+from types import BuiltinMethodType, MethodType
+from typing import Any, Generic, TypeVar
 
 _T = TypeVar('_T')
 
 
 @dataclass(repr=False)
-class Resource(Generic[_T]):
-    """The class for resources.
+class Proxy(Generic[_T]):
+    """The class for resource proxies.
 
     >>> @dataclass
-    ... class X:
-    ...     a: str = 'a'
-    ...     b: str = 'b'
+    ... class Resource:
+    ...     key: Any = 'value'
     ...
-    >>> x = X()
-    >>> x
-    X(a='a', b='b')
-    >>> x.a
-    'a'
-    >>> x.b
-    'b'
+    >>> resource = Resource()
+    >>> resource
+    Resource(key='value')
+    >>> resource.key
+    'value'
 
-    >>> resource = Resource(x, Resource.Mode.READ)
-    >>> resource.a
-    'a'
-    >>> resource.a = 'A'
+    >>> proxy = Proxy(resource, Proxy.Mode.READ)
+    >>> proxy.key
+    'value'
+    >>> proxy.key = 'VALUE'
     Traceback (most recent call last):
         ...
     ValueError: no write permission
-    >>> resource.close()
-    >>> resource.a
+    >>> proxy.close()
+
+    >>> proxy = Proxy(resource, Proxy.Mode.WRITE)
+    >>> proxy.key = 'VALUE'
+    >>> proxy.key
     Traceback (most recent call last):
         ...
     ValueError: no read permission
-    >>> resource.a = 'A'
+    >>> proxy.close()
+
+    >>> proxy = Proxy(resource, Proxy.Mode.READ | Proxy.Mode.WRITE)
+    >>> proxy.key
+    'VALUE'
+    >>> proxy.key = 'value'
+    >>> proxy.key
+    'value'
+    >>> proxy.close()
+
+    >>> proxy.key
+    Traceback (most recent call last):
+        ...
+    ValueError: no read permission
+    >>> proxy.key = 'VALUE'
     Traceback (most recent call last):
         ...
     ValueError: no write permission
 
-    >>> resource = Resource(x, Resource.Mode.WRITE)
-    >>> resource.b = 'B'
-    >>> resource.b
-    Traceback (most recent call last):
-        ...
-    ValueError: no read permission
-    >>> resource.close()
-
-    >>> resource = Resource(x, Resource.Mode.READ | Resource.Mode.WRITE)
-    >>> resource.b
-    'B'
-    >>> resource.a
-    'a'
-    >>> resource.a = 'A'
-    >>> resource.a
-    'A'
-    >>> resource.close()
-    >>> x
-    X(a='A', b='B')
-    >>> x.a
-    'A'
-    >>> x.b
-    'B'
+    >>> resource
+    Resource(key='value')
+    >>> resource.key
+    'value'
     """
 
     class Mode(Flag):
@@ -80,7 +71,7 @@ class Resource(Generic[_T]):
         WRITE = auto()
 
     __initialized = False
-    __raw: _T
+    __resource: _T
     __mode: Mode
 
     def __post_init__(self) -> None:
@@ -93,7 +84,12 @@ class Resource(Generic[_T]):
             if self.Mode.READ not in self.__mode:
                 raise ValueError('no read permission')
 
-            value = getattr(self.__raw, name)
+            value = getattr(self.__resource, name)
+
+        if isinstance(value, MethodType):
+            value = partial(value.__func__, self)
+        elif isinstance(value, BuiltinMethodType):
+            raise ValueError('builtin method type not supported')
 
         return value
 
@@ -107,217 +103,20 @@ class Resource(Generic[_T]):
             if self.Mode.WRITE not in self.__mode:
                 raise ValueError('no write permission')
 
-            setattr(self.__raw, name, value)
+            setattr(self.__resource, name, value)
         else:
             super().__setattr__(name, value)
 
     def close(self) -> None:
         """Close the resource.
 
-        The raw resource becomes inaccessible.
+        The resource becomes inaccessible.
 
         :return: ``None``.
         """
         self.__mode = self.Mode(0)
 
 
-@dataclass
-class Door(Generic[_T]):
-    """The class for doors.
-
-    The door is initialized with the raw resource and corresponding
-    primitive.
-
-    The door can give access to the raw resource based on the desired
-    operation. When the user attempts to access the raw resource in a
-    forbidden way or after its access is expired, an exception will be
-    raised.
-
-    >>> @dataclass
-    ... class X:
-    ...     a: str = 'a'
-    ...     b: str = 'b'
-    ...
-    >>> x = X()
-    >>> x
-    X(a='a', b='b')
-    >>> x.a
-    'a'
-    >>> x.b
-    'b'
-
-    >>> from threading import RLock
-    >>> door = Door(x, RLock())
-
-    >>> with door.read() as resource:
-    ...     resource.a
-    ...
-    'a'
-    >>> resource.a
-    Traceback (most recent call last):
-        ...
-    ValueError: no read permission
-    >>> resource.a = 'A'
-    Traceback (most recent call last):
-        ...
-    ValueError: no write permission
-    >>> with door.read() as resource:
-    ...     resource.a = 'A'
-    ...
-    Traceback (most recent call last):
-        ...
-    ValueError: no write permission
-
-    >>> with door.write() as resource:
-    ...     resource.b = 'B'
-    ...     resource.b
-    ...     resource.a
-    ...     resource.a = 'A'
-    ...     resource.a
-    ...
-    'B'
-    'a'
-    'A'
-
-    >>> x
-    X(a='A', b='B')
-    >>> x.a
-    'A'
-    >>> x.b
-    'B'
-    """
-
-    raw_resource: _T
-    """The raw resource to be accessed."""
-    primitive: Primitive | FineGrainedPrimitive
-    """The synchronization primitive."""
-
-    @contextmanager
-    def read(self) -> Iterator[_T]:
-        """Return the context manager for the resource in read mode.
-
-        After the resource is released, the raw resource becomes
-        inaccessible.
-
-        :return: The context manager for the resource.
-        """
-        if isinstance(self.primitive, FineGrainedPrimitive):
-            self.primitive.acquire_read()
-        else:
-            self.primitive.acquire()
-
-        try:
-            resource = Resource(self.raw_resource, Resource.Mode.READ)
-
-            with closing(resource):
-                yield cast(_T, resource)
-        finally:
-            if isinstance(self.primitive, FineGrainedPrimitive):
-                self.primitive.release_read()
-            else:
-                self.primitive.release()
-
-    @contextmanager
-    def write(self) -> Iterator[_T]:
-        """Return the context manager for the resource in write (and
-        read) mode.
-
-        After the resource is released, the raw resource becomes
-        inaccessible.
-
-        :return: The context manager for the resource.
-        """
-        if isinstance(self.primitive, FineGrainedPrimitive):
-            self.primitive.acquire_write()
-        else:
-            self.primitive.acquire()
-
-        try:
-            resource = Resource(
-                self.raw_resource,
-                Resource.Mode.READ | Resource.Mode.WRITE,
-            )
-
-            with closing(resource):
-                yield cast(_T, resource)
-        finally:
-            if isinstance(self.primitive, FineGrainedPrimitive):
-                self.primitive.release_write()
-            else:
-                self.primitive.release()
-
-
-@dataclass
-class AsyncDoor(Generic[_T]):
-    """The class for doors.
-
-    This class is designed to be used for asynchronous prgramming.
-
-    The door is initialized with the raw resource and corresponding
-    primitive.
-
-    The door can give access to the raw resource based on the desired
-    operation. When the user attempts to access the raw resource in a
-    forbidden way or after its access is expired, an exception will be
-    raised.
-    """
-
-    raw_resource: _T
-    """The raw resource to be accessed."""
-    primitive: AsyncPrimitive | FineGrainedAsyncPrimitive
-    """The synchronization primitive."""
-
-    @asynccontextmanager
-    async def read(self) -> AsyncIterator[_T]:
-        """Return the asynchronous context manager for the resource in
-        read mode.
-
-        After the resource is released, the raw resource becomes
-        inaccessible.
-
-        :return: The context manager for the resource.
-        """
-        if isinstance(self.primitive, FineGrainedAsyncPrimitive):
-            await self.primitive.acquire_read()
-        else:
-            await self.primitive.acquire()
-
-        try:
-            resource = Resource(self.raw_resource, Resource.Mode.READ)
-
-            with closing(resource):
-                yield cast(_T, resource)
-        finally:
-            if isinstance(self.primitive, FineGrainedAsyncPrimitive):
-                await self.primitive.release_read()
-            else:
-                self.primitive.release()
-
-    @asynccontextmanager
-    async def write(self) -> AsyncIterator[_T]:
-        """Return the asynchronous context manager for the resource in
-        write (and read) mode.
-
-        After the resource is released, the raw resource becomes
-        inaccessible.
-
-        :return: The context manager for the resource.
-        """
-        if isinstance(self.primitive, FineGrainedAsyncPrimitive):
-            await self.primitive.acquire_write()
-        else:
-            await self.primitive.acquire()
-
-        try:
-            resource = Resource(
-                self.raw_resource,
-                Resource.Mode.READ | Resource.Mode.WRITE,
-            )
-
-            with closing(resource):
-                yield cast(_T, resource)
-        finally:
-            if isinstance(self.primitive, FineGrainedAsyncPrimitive):
-                await self.primitive.release_write()
-            else:
-                self.primitive.release()
+async def await_if_awaitable(awaitable: Any) -> None:
+    if isinstance(awaitable, Awaitable):
+        await awaitable

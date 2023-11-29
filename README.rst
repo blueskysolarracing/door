@@ -2,15 +2,15 @@
 Door
 ====
 
-Door is a comprehensive python library for advanced synchronization mechanisms.
-Door's reliability has been established through static type checking, extensive
-doctests, and unit tests, achieving 100% code coverage.
+Door is a comprehensive python library for synchronization proxies. Door's
+reliability has been established through static type checking, extensive
+doctests, and unit tests, achieving 98% code coverage.
 
 
 Features
 --------
 
-- Data access system to enforce sound synchronous data access.
+- Synchronization proxies to enforce sound synchronous data access.
 - SLock (Readers-writer lock) implementations.
 - Supported scenarios:
 
@@ -42,56 +42,46 @@ Below shows a sample usage of Door.
 
 .. code-block:: pycon
 
-   >>> from dataclasses import dataclass
-   >>> from door import Door
-   >>> from threading import RLock
    >>> @dataclass
-   ... class X:
-   ...     a: str = 'a'
-   ...     b: str = 'b'
+   ... class Resource:
+   ...     key: Any = 'value'
    ...
-   >>> x = X()
-   >>> x
-   X(a='a', b='b')
-   >>> x.a
-   'a'
-   >>> x.b
-   'b'
-   >>> door = Door(x, RLock())
-   >>> with door.read() as resource:
-   ...     resource.a
+   >>> resource = Resource()
+   >>> resource
+   Resource(key='value')
+   >>> resource.key
+   'value'
+   >>> from door.threading2 import SLock
+   >>> door = SAcquirableDoor(resource, SLock())
+   >>> with door.acquire_read() as proxy:
+   ...     proxy.key
    ...
-   'a'
-   >>> resource.a
+   'value'
+   >>> with door.acquire_read() as proxy:
+   ...     proxy.key = 'VALUE'
+   ...
+   Traceback (most recent call last):
+       ...
+   ValueError: no write permission
+   >>> with door.acquire_write() as proxy:
+   ...     proxy.key
+   ...     proxy.key = 'VALUE'
+   ...     proxy.key
+   ...
+   'value'
+   'VALUE'
+   >>> proxy.key
    Traceback (most recent call last):
        ...
    ValueError: no read permission
-   >>> resource.a = 'A'
+   >>> proxy.key = 'value'
    Traceback (most recent call last):
        ...
    ValueError: no write permission
-   >>> with door.read() as resource:
-   ...     resource.a = 'A'
-   ...
-   Traceback (most recent call last):
-       ...
-   ValueError: no write permission
-   >>> with door.write() as resource:
-   ...     resource.b = 'B'
-   ...     resource.b
-   ...     resource.a
-   ...     resource.a = 'A'
-   ...     resource.a
-   ...
-   'B'
-   'a'
-   'A'
-   >>> x
-   X(a='A', b='B')
-   >>> x.a
-   'A'
-   >>> x.b
-   'B'
+   >>> resource
+   Resource(key='VALUE')
+   >>> resource.key
+   'VALUE'
 
 Testing and Validation
 ----------------------

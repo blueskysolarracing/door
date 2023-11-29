@@ -11,7 +11,7 @@
 
    door
    slock
-   resource
+   proxy
    contributing
    changelog
    reference

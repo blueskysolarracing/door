@@ -4,9 +4,8 @@ from setuptools import find_packages, setup
 
 setup(
     name='door',
-    version='0.0.0',
-    description='A comprehensive python library for advanced synchronization'
-                'mechanisms',
+    version='0.0.1',
+    description='A comprehensive python library for synchronization proxies',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',
     url='https://github.com/blueskysolarracing/door',

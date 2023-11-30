@@ -25,7 +25,8 @@ Features
   - Condition;
   - Semaphore;
   - BoundedSemaphore;
-  - SLock (Readers-writer lock);
+  - RSLock (Read-preferring shared lock);
+  - WSLock (Write-preferring shared lock);
   - et cetera.
 
 Installation
@@ -51,8 +52,8 @@ Below shows a sample usage of Door.
    Resource(key='value')
    >>> resource.key
    'value'
-   >>> from door.threading2 import SLock
-   >>> door = SAcquirableDoor(resource, SLock())
+   >>> from door.threading2 import RSLock
+   >>> door = SAcquirableDoor(resource, RSLock())
    >>> with door.acquire_read() as proxy:
    ...     proxy.key
    ...

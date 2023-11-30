@@ -1,14 +1,19 @@
 """:mod:`door.multiprocessing2` defines utilities for multiprocessing."""
 
 from dataclasses import dataclass, field
-from multiprocessing import RLock
+from multiprocessing import Condition, RLock
 
-from door.primitives import Acquirable, SLock as SyncSLock
+from door.primitives import (
+    Acquirable,
+    RSLock as SyncRSLock,
+    Waitable,
+    WSLock as SyncWSLock,
+)
 
 
 @dataclass
-class SLock(SyncSLock):
-    """The class for shared locks.
+class RSLock(SyncRSLock):
+    """The class for read-preferring shared locks.
 
     This class is designed to be used for multiprocessing.
 
@@ -19,3 +24,13 @@ class SLock(SyncSLock):
 
     _r: Acquirable = field(default_factory=RLock, init=False)
     _g: Acquirable = field(default_factory=RLock, init=False)
+
+
+@dataclass
+class WSLock(SyncWSLock):
+    """The class for write-preferring shared locks.
+
+    This class is designed to be used for multiprocessing.
+    """
+
+    _g: Waitable = field(default_factory=Condition, init=False)

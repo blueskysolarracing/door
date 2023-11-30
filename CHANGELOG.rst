@@ -4,6 +4,14 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
+Version 0.0.2 (Planned)
+---------------------------------
+
+**Changes**
+
+- Split all ``SLock`` to ``RSLock`` and ``WSLock``.
+- Add shared waitables.
+
 Version 0.0.1 (November 29, 2023)
 ---------------------------------
 

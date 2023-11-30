@@ -63,8 +63,8 @@ class SAcquirable(Protocol):
 
 
 @dataclass
-class SLock:
-    """The class for shared locks.
+class RSLock:
+    """The class for read-preferring shared locks.
 
     The implementations in this library is read-preferring and follow
     the pseudocode in Concurrent Programming: Algorithms, Principles,
@@ -75,7 +75,7 @@ class SLock:
     _g: Acquirable
     _b: int = field(default=0, init=False)
 
-    def acquire_read(self) -> bool:
+    def acquire_read(self) -> None:
         self._r.acquire()
 
         self._b += 1
@@ -84,8 +84,6 @@ class SLock:
             self._g.acquire()
 
         self._r.release()
-
-        return True
 
     def release_read(self) -> None:
         self._r.acquire()
@@ -97,18 +95,16 @@ class SLock:
 
         self._r.release()
 
-    def acquire_write(self) -> bool:
+    def acquire_write(self) -> None:
         self._g.acquire()
-
-        return True
 
     def release_write(self) -> None:
         self._g.release()
 
 
 @dataclass
-class AsyncSLock:
-    """The abstract base class for shared locks.
+class AsyncRSLock:
+    """The base class for asynchronous read-preferring shared locks.
 
     This class is designed to be used for asynchronous prgramming.
 
@@ -121,7 +117,7 @@ class AsyncSLock:
     _g: Acquirable
     _b: int = field(default=0, init=False)
 
-    async def acquire_read(self) -> bool:
+    async def acquire_read(self) -> None:
         await await_if_awaitable(self._r.acquire())
 
         self._b += 1
@@ -130,8 +126,6 @@ class AsyncSLock:
             await await_if_awaitable(self._g.acquire())
 
         await await_if_awaitable(self._r.release())
-
-        return True
 
     async def release_read(self) -> None:
         await await_if_awaitable(self._r.acquire())
@@ -143,10 +137,113 @@ class AsyncSLock:
 
         await await_if_awaitable(self._r.release())
 
-    async def acquire_write(self) -> bool:
+    async def acquire_write(self) -> None:
         await await_if_awaitable(self._g.acquire())
 
-        return True
+    async def release_write(self) -> None:
+        await await_if_awaitable(self._g.release())
+
+
+@dataclass
+class WSLock:
+    """The class for write-preferring shared locks."""
+
+    _g: Waitable
+    _num_writers_waiting: int = field(default=0, init=False)
+    _writer_active: bool = field(default=False, init=False)
+    _num_readers_active: int = field(default=0, init=False)
+
+    def acquire_read(self) -> None:
+        self._g.acquire()
+
+        while self._num_writers_waiting > 0 or self._writer_active:
+            self._g.wait()
+
+        self._num_readers_active += 1
+
+        self._g.release()
+
+    def release_read(self) -> None:
+        self._g.acquire()
+
+        self._num_readers_active -= 1
+
+        if self._num_readers_active == 0:
+            self._g.notify_all()
+
+        self._g.release()
+
+    def acquire_write(self) -> None:
+        self._g.acquire()
+
+        self._num_writers_waiting += 1
+
+        while self._num_readers_active > 0 or self._writer_active:
+            self._g.wait()
+
+        self._num_writers_waiting -= 1
+        self._writer_active = True
+
+        self._g.release()
+
+    def release_write(self) -> None:
+        self._g.acquire()
+
+        self._writer_active = False
+
+        self._g.notify_all()
+        self._g.release()
+
+
+@dataclass
+class AsyncWSLock:
+    """The base class for asynchronous write-preferring shared locks.
+
+    This class is designed to be used for asynchronous prgramming.
+    """
+
+    _g: Waitable
+    _num_writers_waiting: int = field(default=0, init=False)
+    _writer_active: bool = field(default=False, init=False)
+    _num_readers_active: int = field(default=0, init=False)
+
+    async def acquire_read(self) -> None:
+        await await_if_awaitable(self._g.acquire())
+
+        while self._num_writers_waiting > 0 or self._writer_active:
+            await await_if_awaitable(self._g.wait())
+
+        self._num_readers_active += 1
+
+        await await_if_awaitable(self._g.release())
+
+    async def release_read(self) -> None:
+        await await_if_awaitable(self._g.acquire())
+
+        self._num_readers_active -= 1
+
+        if self._num_readers_active == 0:
+            await await_if_awaitable(self._g.notify_all())
+
+        await await_if_awaitable(self._g.release())
+
+    async def acquire_write(self) -> None:
+        await await_if_awaitable(self._g.acquire())
+
+        self._num_writers_waiting += 1
+
+        while self._num_readers_active > 0 or self._writer_active:
+            await await_if_awaitable(self._g.wait())
+
+        self._num_writers_waiting -= 1
+        self._writer_active = True
+
+        await await_if_awaitable(self._g.release())
 
     async def release_write(self) -> None:
+        await await_if_awaitable(self._g.acquire())
+
+        self._writer_active = False
+
+        await await_if_awaitable(self._g.notify_all())
         await await_if_awaitable(self._g.release())

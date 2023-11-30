@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 from unittest import IsolatedAsyncioTestCase, main
 
-from door.asyncio2 import SLock
+from door.asyncio2 import RSLock, WSLock
 from door.primitives import Acquirable, SAcquirable
 from door.doors import AsyncAcquirableDoor, AsyncSAcquirableDoor
 
@@ -40,7 +40,8 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
             key: Any = 'value'
 
         for primitive in (
-                SLock(),
+                RSLock(),
+                WSLock(),
         ):
             assert isinstance(primitive, SAcquirable)
 

@@ -237,8 +237,8 @@ class SAcquirableDoor(Generic[_T]):
     >>> resource.key
     'value'
 
-    >>> from door.threading2 import SLock
-    >>> door = SAcquirableDoor(resource, SLock())
+    >>> from door.threading2 import RSLock
+    >>> door = SAcquirableDoor(resource, RSLock())
 
     >>> with door.acquire_read() as proxy:
     ...     proxy.key

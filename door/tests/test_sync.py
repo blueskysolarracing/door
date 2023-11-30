@@ -47,8 +47,10 @@ class SyncTestCase(TestCase):
             key: Any = 'value'
 
         for primitive in (
-                threading2.SLock(),
-                multiprocessing2.SLock(),
+                threading2.RSLock(),
+                threading2.WSLock(),
+                multiprocessing2.RSLock(),
+                multiprocessing2.WSLock(),
         ):
             assert isinstance(primitive, SAcquirable)
 

@@ -32,7 +32,7 @@ are compatible with :class:`door.doors.WaitableDoor`.
 As long as the primitive implements :class:`door.primitives.SAcquirable`, they
 are compatible with :class:`door.doors.SAcquirableDoor`.
 
-- SLock (Readers-writer lock);
+- RSLock (Read-preferring shared lock);
 - et cetera.
 
 Below shows sample usages of doors.
@@ -76,8 +76,8 @@ Below shows sample usages of doors.
    Resource(key='value')
    >>> resource.key
    'value'
-   >>> from door.threading2 import SLock
-   >>> door = SAcquirableDoor(resource, SLock())
+   >>> from door.threading2 import RSLock
+   >>> door = SAcquirableDoor(resource, RSLock())
    >>> with door.acquire_read() as proxy:
    ...     proxy.key
    ...

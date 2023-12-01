@@ -4,7 +4,7 @@ Door
 
 Door is a comprehensive python library for synchronization proxies. Door's
 reliability has been established through static type checking, extensive
-doctests, and unit tests, achieving 83% code coverage.
+doctests, and unit tests, achieving 91% code coverage.
 
 
 Features
@@ -29,6 +29,15 @@ Features
     - et cetera.
 
 - Shared lock (Readers-writer lock) implementations.
+
+  - Supported scenarios:
+  
+    - Multithreading;
+    - Multiprocessing;
+    - Asynchronous programming.
+
+- Shared condition variable (Readers-writer condition variables)
+  implementations.
 
   - Supported scenarios:
   

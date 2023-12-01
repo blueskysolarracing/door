@@ -22,14 +22,14 @@ class Acquirable(Protocol):
 
 @runtime_checkable
 class Waitable(Acquirable, Protocol):
-    """A protocol for acquirable primitives."""
+    """A protocol for waitable primitives."""
 
     def wait(self) -> Any:
         """Wait."""
         pass  # pragma: no cover
 
     def wait_for(self, predicate: Callable[[], bool]) -> Any:
-        """Wait."""
+        """Wait for the predicate to hold ``True``."""
         pass  # pragma: no cover
 
     def notify(self) -> Any:
@@ -43,7 +43,7 @@ class Waitable(Acquirable, Protocol):
 
 @runtime_checkable
 class SAcquirable(Protocol):
-    """A protocol for shared primitives."""
+    """A protocol for shared acquiarables."""
 
     def acquire_read(self) -> Any:
         """Acquire the primitive for reading."""
@@ -59,6 +59,43 @@ class SAcquirable(Protocol):
 
     def release_write(self) -> Any:
         """Release the primitive for writing (and reading)."""
+        pass  # pragma: no cover
+
+
+@runtime_checkable
+class SWaitable(SAcquirable, Protocol):
+    """A protocol for shared waitable primitives."""
+
+    def wait_read(self) -> Any:
+        """Wait for reading."""
+        pass  # pragma: no cover
+
+    def wait_for_read(self, predicate: Callable[[], bool]) -> Any:
+        """Wait for the predicate to hold ``True`` for reading."""
+        pass  # pragma: no cover
+
+    def notify_read(self) -> Any:
+        """notify one for reading."""
+        pass  # pragma: no cover
+
+    def notify_all_read(self) -> Any:
+        """notify all for reading."""
+        pass  # pragma: no cover
+
+    def wait_write(self) -> Any:
+        """Wait for writing."""
+        pass  # pragma: no cover
+
+    def wait_for_write(self, predicate: Callable[[], bool]) -> Any:
+        """Wait for the predicate to hold ``True`` for writing."""
+        pass  # pragma: no cover
+
+    def notify_write(self) -> Any:
+        """notify one for writing."""
+        pass  # pragma: no cover
+
+    def notify_all_write(self) -> Any:
+        """notify all for writing."""
         pass  # pragma: no cover
 
 
@@ -104,7 +141,7 @@ class RSLock:
 
 @dataclass
 class AsyncRSLock:
-    """The base class for asynchronous read-preferring shared locks.
+    """The class for asynchronous read-preferring shared locks.
 
     This class is designed to be used for asynchronous prgramming.
 
@@ -197,7 +234,7 @@ class WSLock:
 
 @dataclass
 class AsyncWSLock:
-    """The base class for asynchronous write-preferring shared locks.
+    """The class for asynchronous write-preferring shared locks.
 
     This class is designed to be used for asynchronous prgramming.
     """
@@ -247,3 +284,161 @@ class AsyncWSLock:
 
         await await_if_awaitable(self._g.notify_all())
         await await_if_awaitable(self._g.release())
+
+
+@dataclass
+class SCondition:
+    """The class for shared condition variables.
+
+    This class is designed to be used for asynchronous prgramming.
+    """
+
+    _s: SAcquirable
+    _a: Waitable
+
+    def acquire_read(self) -> None:
+        self._s.acquire_read()
+
+    def release_read(self) -> None:
+        self._s.release_read()
+
+    def wait_read(self) -> None:
+        self._a.acquire()
+        self._s.release_read()
+        self._a.wait()
+        self._s.acquire_read()
+        self._a.release()
+
+    def wait_for_read(self, predicate: Callable[[], bool]) -> None:
+        self._a.acquire()
+        self._s.release_read()
+        self._a.wait_for(predicate)
+        self._s.acquire_read()
+        self._a.release()
+
+    def notify_read(self) -> None:
+        self._a.acquire()
+        self._s.release_read()
+        self._a.notify()
+        self._s.acquire_read()
+        self._a.release()
+
+    def notify_all_read(self) -> None:
+        self._a.acquire()
+        self._s.release_read()
+        self._a.notify_all()
+        self._s.acquire_read()
+        self._a.release()
+
+    def acquire_write(self) -> None:
+        self._s.acquire_write()
+
+    def release_write(self) -> None:
+        self._s.release_write()
+
+    def wait_write(self) -> None:
+        self._a.acquire()
+        self._s.release_write()
+        self._a.wait()
+        self._s.acquire_write()
+        self._a.release()
+
+    def wait_for_write(self, predicate: Callable[[], bool]) -> None:
+        self._a.acquire()
+        self._s.release_write()
+        self._a.wait_for(predicate)
+        self._s.acquire_write()
+        self._a.release()
+
+    def notify_write(self) -> None:
+        self._a.acquire()
+        self._s.release_write()
+        self._a.notify()
+        self._s.acquire_write()
+        self._a.release()
+
+    def notify_all_write(self) -> None:
+        self._a.acquire()
+        self._s.release_write()
+        self._a.notify_all()
+        self._s.acquire_write()
+        self._a.release()
+
+
+@dataclass
+class AsyncSCondition:
+    """The class for asynchronous shared condition variables.
+
+    This class is designed to be used for asynchronous prgramming.
+    """
+
+    _s: SAcquirable
+    _a: Waitable
+
+    async def acquire_read(self) -> None:
+        await await_if_awaitable(self._s.acquire_read())
+
+    async def release_read(self) -> None:
+        await await_if_awaitable(self._s.release_read())
+
+    async def wait_read(self) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_read())
+        await await_if_awaitable(self._a.wait())
+        await await_if_awaitable(self._s.acquire_read())
+        await await_if_awaitable(self._a.release())
+
+    async def wait_for_read(self, predicate: Callable[[], bool]) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_read())
+        await await_if_awaitable(self._a.wait_for(predicate))
+        await await_if_awaitable(self._s.acquire_read())
+        await await_if_awaitable(self._a.release())
+
+    async def notify_read(self) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_read())
+        await await_if_awaitable(self._a.notify())
+        await await_if_awaitable(self._s.acquire_read())
+        await await_if_awaitable(self._a.release())
+
+    async def notify_all_read(self) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_read())
+        await await_if_awaitable(self._a.notify_all())
+        await await_if_awaitable(self._s.acquire_read())
+        await await_if_awaitable(self._a.release())
+
+    async def acquire_write(self) -> None:
+        await await_if_awaitable(self._s.acquire_write())
+
+    async def release_write(self) -> None:
+        await await_if_awaitable(self._s.release_write())
+
+    async def wait_write(self) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_write())
+        await await_if_awaitable(self._a.wait())
+        await await_if_awaitable(self._s.acquire_write())
+        await await_if_awaitable(self._a.release())
+
+    async def wait_for_write(self, predicate: Callable[[], bool]) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_write())
+        await await_if_awaitable(self._a.wait_for(predicate))
+        await await_if_awaitable(self._s.acquire_write())
+        await await_if_awaitable(self._a.release())
+
+    async def notify_write(self) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_write())
+        await await_if_awaitable(self._a.notify())
+        await await_if_awaitable(self._s.acquire_write())
+        await await_if_awaitable(self._a.release())
+
+    async def notify_all_write(self) -> None:
+        await await_if_awaitable(self._a.acquire())
+        await await_if_awaitable(self._s.release_write())
+        await await_if_awaitable(self._a.notify_all())
+        await await_if_awaitable(self._s.acquire_write())
+        await await_if_awaitable(self._a.release())

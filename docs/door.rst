@@ -51,7 +51,7 @@ Below shows sample usages of doors.
    >>> from threading import Lock
    >>> door = AcquirableDoor(resource, Lock())
 
-   >>> with door.acquire() as proxy:
+   >>> with door() as proxy:
    ...     proxy.key
    ...     proxy.key = 'VALUE'
    ...     proxy.key
@@ -78,17 +78,17 @@ Below shows sample usages of doors.
    'value'
    >>> from door.threading2 import RSLock
    >>> door = SAcquirableDoor(resource, RSLock())
-   >>> with door.acquire_read() as proxy:
+   >>> with door.read() as proxy:
    ...     proxy.key
    ...
    'value'
-   >>> with door.acquire_read() as proxy:
+   >>> with door.read() as proxy:
    ...     proxy.key = 'VALUE'
    ...
    Traceback (most recent call last):
        ...
    ValueError: no write permission
-   >>> with door.acquire_write() as proxy:
+   >>> with door.write() as proxy:
    ...     proxy.key
    ...     proxy.key = 'VALUE'
    ...     proxy.key

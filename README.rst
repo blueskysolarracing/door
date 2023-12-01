@@ -4,30 +4,37 @@ Door
 
 Door is a comprehensive python library for synchronization proxies. Door's
 reliability has been established through static type checking, extensive
-doctests, and unit tests, achieving 98% code coverage.
+doctests, and unit tests, achieving 83% code coverage.
 
 
 Features
 --------
 
 - Synchronization proxies to enforce sound synchronous data access.
-- SLock (Readers-writer lock) implementations.
-- Supported scenarios:
 
-  - Multithreading;
-  - Multiprocessing;
-  - Asynchronous programming.
+  - Supported scenarios:
+  
+    - Multithreading;
+    - Asynchronous programming.
 
-- Supported primitives:
+  - Supported primitives:
+  
+    - Lock;
+    - RLock;
+    - Condition;
+    - Semaphore;
+    - BoundedSemaphore;
+    - RSLock (Read-preferring shared lock);
+    - WSLock (Write-preferring shared lock);
+    - et cetera.
 
-  - Lock;
-  - RLock;
-  - Condition;
-  - Semaphore;
-  - BoundedSemaphore;
-  - RSLock (Read-preferring shared lock);
-  - WSLock (Write-preferring shared lock);
-  - et cetera.
+- Shared lock (Readers-writer lock) implementations.
+
+  - Supported scenarios:
+  
+    - Multithreading;
+    - Multiprocessing;
+    - Asynchronous programming.
 
 Installation
 ------------
@@ -54,17 +61,17 @@ Below shows a sample usage of Door.
    'value'
    >>> from door.threading2 import RSLock
    >>> door = SAcquirableDoor(resource, RSLock())
-   >>> with door.acquire_read() as proxy:
+   >>> with door.read() as proxy:
    ...     proxy.key
    ...
    'value'
-   >>> with door.acquire_read() as proxy:
+   >>> with door.read() as proxy:
    ...     proxy.key = 'VALUE'
    ...
    Traceback (most recent call last):
        ...
    ValueError: no write permission
-   >>> with door.acquire_write() as proxy:
+   >>> with door.write() as proxy:
    ...     proxy.key
    ...     proxy.key = 'VALUE'
    ...     proxy.key

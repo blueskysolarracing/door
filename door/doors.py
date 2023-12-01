@@ -3,10 +3,9 @@
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager, closing, contextmanager
 from dataclasses import dataclass
-from functools import partial
 from typing import Any, cast, Generic, TypeVar
 
-from door.primitives import Acquirable, SAcquirable, Waitable
+from door.primitives import Acquirable, SAcquirable, SWaitable, Waitable
 from door.utilities import Proxy, await_if_awaitable
 
 _T = TypeVar('_T')
@@ -37,7 +36,7 @@ class AcquirableDoor(Generic[_T]):
     >>> from threading import Lock
     >>> door = AcquirableDoor(resource, Lock())
 
-    >>> with door.acquire() as proxy:
+    >>> with door() as proxy:
     ...     proxy.key
     ...     proxy.key = 'VALUE'
     ...     proxy.key
@@ -66,7 +65,7 @@ class AcquirableDoor(Generic[_T]):
     """The synchronization primitive."""
 
     @contextmanager
-    def acquire(self) -> Iterator[_T]:
+    def __call__(self) -> Iterator[_T]:
         """Return the context manager for the resource.
 
         After the resource is released, the resource becomes
@@ -106,7 +105,7 @@ class AsyncAcquirableDoor(Generic[_T]):
     """The synchronization primitive."""
 
     @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[_T]:
+    async def __call__(self) -> AsyncIterator[_T]:
         """Return the asynchronous context manager for the resource.
 
         After the resource is released, the resource becomes
@@ -147,12 +146,12 @@ class WaitableDoor(AcquirableDoor[_T]):
         """
         self.primitive.wait()
 
-    def wait_for(self, predicate: Callable[[_T], bool]) -> None:
+    def wait_for(self, predicate: Callable[[], bool]) -> None:
         """Wait for the predicate to hold ``True``.
 
         :return: ``None``.
         """
-        self.primitive.wait_for(partial(predicate, self.resource))
+        self.primitive.wait_for(predicate)
 
     def notify(self) -> None:
         """Notify one.
@@ -240,19 +239,19 @@ class SAcquirableDoor(Generic[_T]):
     >>> from door.threading2 import RSLock
     >>> door = SAcquirableDoor(resource, RSLock())
 
-    >>> with door.acquire_read() as proxy:
+    >>> with door.read() as proxy:
     ...     proxy.key
     ...
     'value'
 
-    >>> with door.acquire_read() as proxy:
+    >>> with door.read() as proxy:
     ...     proxy.key = 'VALUE'
     ...
     Traceback (most recent call last):
         ...
     ValueError: no write permission
 
-    >>> with door.acquire_write() as proxy:
+    >>> with door.write() as proxy:
     ...     proxy.key
     ...     proxy.key = 'VALUE'
     ...     proxy.key
@@ -281,7 +280,7 @@ class SAcquirableDoor(Generic[_T]):
     """The synchronization primitive."""
 
     @contextmanager
-    def acquire_read(self) -> Iterator[_T]:
+    def read(self) -> Iterator[_T]:
         """Return the context manager for the resource in read mode.
 
         After the resource is released, the resource becomes
@@ -300,7 +299,7 @@ class SAcquirableDoor(Generic[_T]):
             self.primitive.release_read()
 
     @contextmanager
-    def acquire_write(self) -> Iterator[_T]:
+    def write(self) -> Iterator[_T]:
         """Return the context manager for the resource in write (and
         read) mode.
 
@@ -341,7 +340,7 @@ class AsyncSAcquirableDoor(Generic[_T]):
     """The synchronization primitive."""
 
     @asynccontextmanager
-    async def acquire_read(self) -> AsyncIterator[_T]:
+    async def read(self) -> AsyncIterator[_T]:
         """Return the asynchronous context manager for the resource in
         read mode.
 
@@ -361,7 +360,7 @@ class AsyncSAcquirableDoor(Generic[_T]):
             await await_if_awaitable(self.primitive.release_read())
 
     @asynccontextmanager
-    async def acquire_write(self) -> AsyncIterator[_T]:
+    async def write(self) -> AsyncIterator[_T]:
         """Return the asynchronous context manager for the resource in
         write (and read) mode.
 
@@ -379,3 +378,149 @@ class AsyncSAcquirableDoor(Generic[_T]):
                 yield cast(_T, resource)
         finally:
             await await_if_awaitable(self.primitive.release_write())
+
+
+@dataclass
+class SWaitableDoor(SAcquirableDoor[_T]):
+    """The class for shared waitable doors.
+
+    The door is initialized with the resource and corresponding
+    primitive.
+
+    The door can give access to the resource based on the desired
+    operation.  When the user attempts to access the resource in a
+    forbidden way or after its access is expired, an exception will
+    be raised.
+    """
+
+    primitive: SWaitable
+
+    def wait_read(self) -> None:
+        """Wait for reading.
+
+        :return: ``None``.
+        """
+        self.primitive.wait_read()
+
+    def wait_for_read(self, predicate: Callable[[], bool]) -> None:
+        """Wait for the predicate to hold ``True`` for reading.
+
+        :return: ``None``.
+        """
+        self.primitive.wait_for_read(predicate)
+
+    def notify_read(self) -> None:
+        """Notify one for reading.
+
+        :return: ``None``.
+        """
+        self.primitive.notify_read()
+
+    def notify_all_read(self) -> None:
+        """Notify all for reading.
+
+        :return: ``None``.
+        """
+        self.primitive.notify_all_read()
+
+    def wait_write(self) -> None:
+        """Wait for writing.
+
+        :return: ``None``.
+        """
+        self.primitive.wait_write()
+
+    def wait_for_write(self, predicate: Callable[[], bool]) -> None:
+        """Wait for the predicate to hold ``True`` for writing.
+
+        :return: ``None``.
+        """
+        self.primitive.wait_for_write(predicate)
+
+    def notify_write(self) -> None:
+        """Notify one for writing.
+
+        :return: ``None``.
+        """
+        self.primitive.notify_write()
+
+    def notify_all_write(self) -> None:
+        """Notify all for writing.
+
+        :return: ``None``.
+        """
+        self.primitive.notify_all_write()
+
+
+@dataclass
+class AsyncSWaitableDoor(AsyncSAcquirableDoor[_T]):
+    """The class for asynchronous shared waitable doors.
+
+    This class is designed to be used for asynchronous prgramming.
+
+    The door is initialized with the resource and corresponding
+    primitive.
+
+    The door can give access to the resource based on the desired
+    operation. When the user attempts to access the resource in a
+    forbidden way or after its access is expired, an exception will be
+    raised.
+    """
+
+    primitive: SWaitable
+
+    async def wait_read(self) -> None:
+        """Wait for reading.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.wait_read())
+
+    async def wait_for_read(self, predicate: Callable[[], Any]) -> None:
+        """Wait for the predicate to hold ``True`` for reading.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.wait_for_read(predicate))
+
+    async def notify_read(self) -> None:
+        """Notify one for reading.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.notify_read())
+
+    async def notify_all_read(self) -> None:
+        """Notify all for reading.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.notify_all_read())
+
+    async def wait_write(self) -> None:
+        """Wait for writing.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.wait_write())
+
+    async def wait_for_write(self, predicate: Callable[[], Any]) -> None:
+        """Wait for the predicate to hold ``True`` for writing.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.wait_for_write(predicate))
+
+    async def notify_write(self) -> None:
+        """Notify one for writing.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.notify_write())
+
+    async def notify_all_write(self) -> None:
+        """Notify all for writing.
+
+        :return: ``None``.
+        """
+        await await_if_awaitable(self.primitive.notify_all_write())

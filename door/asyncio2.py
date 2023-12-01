@@ -3,7 +3,14 @@
 from asyncio import Condition, Lock
 from dataclasses import dataclass, field
 
-from door.primitives import Acquirable, AsyncRSLock, AsyncWSLock, Waitable
+from door.primitives import (
+    Acquirable,
+    AsyncRSLock,
+    AsyncSCondition,
+    AsyncWSLock,
+    SAcquirable,
+    Waitable,
+)
 
 
 @dataclass
@@ -17,8 +24,8 @@ class RSLock(AsyncRSLock):
     and Foundations by Michel Raynal.
     """
 
-    _r: Acquirable = field(default_factory=Lock, init=False)
-    _g: Acquirable = field(default_factory=Lock, init=False)
+    _r: Acquirable = field(default_factory=Lock)
+    _g: Acquirable = field(default_factory=Lock)
 
 
 @dataclass
@@ -28,4 +35,26 @@ class WSLock(AsyncWSLock):
     This class is designed to be used for asynchronous programming.
     """
 
-    _g: Waitable = field(default_factory=Condition, init=False)
+    _g: Waitable = field(default_factory=Condition)
+
+
+@dataclass
+class RSCondition(AsyncSCondition):
+    """The class for asynchronous read-preferring shared condition variables.
+
+    This class is designed to be used for asynchronous programming.
+    """
+
+    _s: SAcquirable = field(default_factory=RSLock)
+    _a: Waitable = field(default_factory=Condition)
+
+
+@dataclass
+class WSCondition(AsyncSCondition):
+    """The class for asynchronous write-preferring shared condition variables.
+
+    This class is designed to be used for asynchronous programming.
+    """
+
+    _s: SAcquirable = field(default_factory=WSLock)
+    _a: Waitable = field(default_factory=Condition)

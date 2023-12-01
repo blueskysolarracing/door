@@ -8,9 +8,9 @@ setup(
     description='A comprehensive python library for synchronization proxies',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',
-    url='https://github.com/AussieSeaweed/door',
-    author='Juho Kim',
-    author_email='juho-kim@outlook.com',
+    url='https://github.com/blueskysolarracing/door',
+    author='Blue Sky Solar Racing',
+    author_email='blueskysolar@studentorg.utoronto.ca',
     license='MIT',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -29,8 +29,8 @@ setup(
     keywords=['python', 'synchronization'],
     project_urls={
         'Documentation': 'https://door.readthedocs.io/en/latest/',
-        'Source': 'https://github.com/AussieSeaweed/door',
-        'Tracker': 'https://github.com/AussieSeaweed/door/issues',
+        'Source': 'https://github.com/blueskysolarracing/door',
+        'Tracker': 'https://github.com/blueskysolarracing/door/issues',
     },
     packages=find_packages(),
     python_requires='>=3.11',

@@ -12,6 +12,9 @@ Version 0.0.2 (November 30, 2023)
 - Split all ``SLock`` to ``RSLock`` and ``WSLock``.
 - Rename ``door.acquire`` to ``door.__call__``, ``door.acquire_read`` to
   ``door.read``, ``door.acquire_write`` to ``door.write``.
+
+**Additions**
+
 - Add shared waitables.
 
 Version 0.0.1 (November 29, 2023)

@@ -4,6 +4,19 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
+Version 0.0.3 (December 3, 2023)
+--------------------------------
+
+**Changes**
+
+- Doors now compatible with multiprocessing.
+- Each door class now in ``door.threading2``, ``door.asyncio2``, and
+  ``door.multiprocessing2``.
+
+**Additions**
+
+- Add ``door.utilities.Handle`` for object sharing across processes.
+
 Version 0.0.2 (November 30, 2023)
 ---------------------------------
 

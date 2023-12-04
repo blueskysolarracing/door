@@ -1,18 +1,18 @@
 from dataclasses import dataclass
-from threading import (
+from multiprocessing import (
     BoundedSemaphore,
     Condition,
     Lock,
     RLock,
     Semaphore,
-    Thread,
+    Process,
 )
 from unittest import main, TestCase
 
-from door.multiprocessing2 import Handle
 from door.primitives import Acquirable, SAcquirable, SWaitable, Waitable
-from door.threading2 import (
+from door.multiprocessing2 import (
     AcquirableDoor,
+    Handle,
     RSCondition,
     RSLock,
     SAcquirableDoor,
@@ -23,7 +23,7 @@ from door.threading2 import (
 )
 
 
-class ThreadingTestCase(TestCase):
+class MultiprocessingTestCase(TestCase):
     @dataclass
     class Resource:
         key: str = 'value'
@@ -37,11 +37,8 @@ class ThreadingTestCase(TestCase):
     class Counter:
         value: int = 0
 
-    def test_unhandled(self) -> None:
-        handle = Handle(None)
-
-        self.assertRaises(ValueError, AcquirableDoor, handle, Lock())
-        handle.unlink()
+    def test_handled(self) -> None:
+        self.assertRaises(ValueError, AcquirableDoor, None, Lock())
 
     def test_acquirable(self) -> None:
         for primitive in (
@@ -53,8 +50,11 @@ class ThreadingTestCase(TestCase):
         ):
             assert isinstance(primitive, Acquirable)
 
-            resource = self.Resource()
-            door = AcquirableDoor(resource, primitive)
+            handle = Handle(self.Resource())
+            door = AcquirableDoor[MultiprocessingTestCase.Resource](
+                handle,
+                primitive,
+            )
 
             with door() as proxy:
                 self.assertEqual(proxy.key, 'value')
@@ -63,10 +63,11 @@ class ThreadingTestCase(TestCase):
 
             self.assertRaises(ValueError, getattr, proxy, 'key')
             self.assertRaises(ValueError, setattr, proxy, 'key', 'value')
-            self.assertEqual(resource, self.Resource('VALUE'))
+            self.assertEqual(handle.get(), self.Resource('VALUE'))
+            handle.unlink()
 
     def test_waitable(self) -> None:
-        def worker() -> None:
+        def worker() -> None:  # pragma: no cover
             with door() as proxy:
                 while not proxy.ready:
                     door.wait()
@@ -80,11 +81,14 @@ class ThreadingTestCase(TestCase):
         ):
             assert isinstance(primitive, Waitable)
 
-            resource = self.Flags()
-            door = WaitableDoor(resource, primitive)
-            thread = Thread(target=worker)
+            handle = Handle(self.Flags())
+            door = WaitableDoor[MultiprocessingTestCase.Flags](
+                handle,
+                primitive,
+            )
+            process = Process(target=worker)
 
-            thread.start()
+            process.start()
 
             with door() as proxy:
                 proxy.ready = True
@@ -97,7 +101,8 @@ class ThreadingTestCase(TestCase):
 
                 self.assertTrue(proxy.processed)
 
-            thread.join()
+            process.join()
+            handle.unlink()
 
     def test_shared_acquirable_0(self) -> None:
         for primitive in (
@@ -108,8 +113,11 @@ class ThreadingTestCase(TestCase):
         ):
             assert isinstance(primitive, SAcquirable)
 
-            resource = self.Resource()
-            door = SAcquirableDoor(resource, primitive)
+            handle = Handle(self.Resource())
+            door = SAcquirableDoor[MultiprocessingTestCase.Resource](
+                handle,
+                primitive,
+            )
 
             with door.read() as proxy:
                 self.assertEqual(proxy.key, 'value')
@@ -122,21 +130,22 @@ class ThreadingTestCase(TestCase):
 
             self.assertRaises(ValueError, getattr, proxy, 'key')
             self.assertRaises(ValueError, setattr, proxy, 'key', 'value')
-            self.assertEqual(resource, self.Resource('VALUE'))
+            self.assertEqual(handle.get(), self.Resource('VALUE'))
+            handle.unlink()
 
     def test_shared_acquirable_1(self) -> None:
         ITER_COUNT = 1000
         PARALLELISM_COUNT = 10
 
-        def read() -> int:
+        def read() -> int:  # pragma: no cover
             with door.read() as proxy:
                 return proxy.value
 
-        def write() -> None:
+        def write() -> None:  # pragma: no cover
             with door.write() as proxy:
                 proxy.value += 1
 
-        def target() -> None:
+        def target() -> None:  # pragma: no cover
             for _ in range(ITER_COUNT):
                 write()
                 read()
@@ -149,23 +158,31 @@ class ThreadingTestCase(TestCase):
         ):
             assert isinstance(primitive, SAcquirable)
 
-            counter = self.Counter()
-            door = SAcquirableDoor(counter, primitive)
-            threads = []
+            handle = Handle(self.Counter())
+            door = SAcquirableDoor[MultiprocessingTestCase.Counter](
+                handle,
+                primitive,
+            )
+            processs = []
 
             for _ in range(PARALLELISM_COUNT):
-                thread = Thread(target=target)
+                process = Process(target=target)
 
-                thread.start()
-                threads.append(thread)
+                process.start()
+                processs.append(process)
 
-            for thread in threads:
-                thread.join()
+            for process in processs:
+                process.join()
 
-            self.assertEqual(counter.value, ITER_COUNT * PARALLELISM_COUNT)
+            self.assertEqual(
+                handle.get().value,
+                ITER_COUNT * PARALLELISM_COUNT,
+            )
+
+            handle.unlink()
 
     def test_shared_waitable(self) -> None:
-        def worker() -> None:
+        def worker() -> None:  # pragma: no cover
             with door.write() as proxy:
                 while not proxy.ready:
                     door.wait_write()
@@ -180,11 +197,14 @@ class ThreadingTestCase(TestCase):
         ):
             assert isinstance(primitive, SWaitable)
 
-            resource = self.Flags()
-            door = SWaitableDoor(resource, primitive)
-            thread = Thread(target=worker)
+            handle = Handle(self.Flags())
+            door = SWaitableDoor[MultiprocessingTestCase.Flags](
+                handle,
+                primitive,
+            )
+            process = Process(target=worker)
 
-            thread.start()
+            process.start()
 
             with door.write() as proxy:
                 proxy.ready = True
@@ -197,7 +217,8 @@ class ThreadingTestCase(TestCase):
 
                 self.assertTrue(proxy.processed)
 
-            thread.join()
+            process.join()
+            handle.unlink()
 
 
 if __name__ == '__main__':

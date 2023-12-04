@@ -10,7 +10,9 @@
    :caption: Contents:
 
    door
+   handle
    slock
+   scondition
    proxy
    contributing
    changelog

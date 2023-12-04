@@ -7,25 +7,43 @@ from asyncio import (
     Semaphore,
 )
 from dataclasses import dataclass
-from typing import Any
 from unittest import IsolatedAsyncioTestCase, main
 
-from door.asyncio2 import RSCondition, RSLock, WSCondition, WSLock
-from door.primitives import Acquirable, SAcquirable, SWaitable, Waitable
-from door.doors import (
-    AsyncAcquirableDoor,
-    AsyncSAcquirableDoor,
-    AsyncSWaitableDoor,
-    AsyncWaitableDoor,
+from door.asyncio2 import (
+    AcquirableDoor,
+    RSCondition,
+    RSLock,
+    SAcquirableDoor,
+    SWaitableDoor,
+    WaitableDoor,
+    WSCondition,
+    WSLock,
 )
+from door.multiprocessing2 import Handle
+from door.primitives import Acquirable, SAcquirable, SWaitable, Waitable
 
 
-class AsyncTestCase(IsolatedAsyncioTestCase):
+class AsyncioTestCase(IsolatedAsyncioTestCase):
+    @dataclass
+    class Resource:
+        key: str = 'value'
+
+    @dataclass
+    class Flags:
+        ready: bool = False
+        processed: bool = False
+
+    @dataclass
+    class Counter:
+        value: int = 0
+
+    def test_unhandled(self) -> None:
+        handle = Handle(None)
+
+        self.assertRaises(ValueError, AcquirableDoor, handle, Lock())
+        handle.unlink()
+
     async def test_acquirable(self) -> None:
-        @dataclass
-        class Resource:
-            key: Any = 'value'
-
         for primitive in (
                 Lock(),
                 Condition(),
@@ -34,8 +52,8 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
         ):
             assert isinstance(primitive, Acquirable)
 
-            resource = Resource()
-            door = AsyncAcquirableDoor(resource, primitive)
+            resource = self.Resource()
+            door = AcquirableDoor(resource, primitive)
 
             async with door() as proxy:
                 self.assertEqual(proxy.key, 'value')
@@ -44,17 +62,13 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
 
             self.assertRaises(ValueError, getattr, proxy, 'key')
             self.assertRaises(ValueError, setattr, proxy, 'key', 'value')
-            self.assertEqual(resource, Resource('VALUE'))
+            self.assertEqual(resource, self.Resource('VALUE'))
 
     async def test_waitable(self) -> None:
-        @dataclass
-        class Flags:
-            ready: bool = False
-            processed: bool = False
-
         async def worker() -> None:
             async with door() as proxy:
-                await door.wait_for(lambda: proxy.ready)
+                while not proxy.ready:
+                    await door.wait()
 
                 proxy.processed = True
 
@@ -65,8 +79,9 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
         ):
             assert isinstance(primitive, Waitable)
 
+            resource = self.Flags()
+            door = WaitableDoor(resource, primitive)
             task = create_task(worker())
-            door = AsyncWaitableDoor(Flags(), primitive)
 
             async with door() as proxy:
                 proxy.ready = True
@@ -74,17 +89,14 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
                 await door.notify()
 
             async with door() as proxy:
-                await door.wait_for(lambda: proxy.processed)
+                while not proxy.processed:
+                    await door.wait()
 
                 self.assertTrue(proxy.processed)
 
             await task
 
     async def test_shared_acquirable_0(self) -> None:
-        @dataclass
-        class Resource:
-            key: Any = 'value'
-
         for primitive in (
                 RSLock(),
                 WSLock(),
@@ -93,8 +105,8 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
         ):
             assert isinstance(primitive, SAcquirable)
 
-            resource = Resource()
-            door = AsyncSAcquirableDoor(resource, primitive)
+            resource = self.Resource()
+            door = SAcquirableDoor(resource, primitive)
 
             async with door.read() as proxy:
                 self.assertEqual(proxy.key, 'value')
@@ -107,15 +119,11 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
 
             self.assertRaises(ValueError, getattr, proxy, 'key')
             self.assertRaises(ValueError, setattr, proxy, 'key', 'value')
-            self.assertEqual(resource, Resource('VALUE'))
+            self.assertEqual(resource, self.Resource('VALUE'))
 
     async def test_shared_acquirable_1(self) -> None:
         ITER_COUNT = 1000
         PARALLELISM_COUNT = 10
-
-        @dataclass
-        class Counter:
-            value: int = 0
 
         async def read() -> int:
             async with door.read() as proxy:
@@ -138,8 +146,8 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
         ):
             assert isinstance(primitive, SAcquirable)
 
-            counter = Counter()
-            door = AsyncSAcquirableDoor(counter, primitive)
+            counter = self.Counter()
+            door = SAcquirableDoor(counter, primitive)
             tasks = []
 
             for _ in range(PARALLELISM_COUNT):
@@ -149,18 +157,13 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
 
             await gather(*tasks)
 
-            async with door.read() as proxy:
-                self.assertEqual(proxy.value, ITER_COUNT * PARALLELISM_COUNT)
+            self.assertEqual(counter.value, ITER_COUNT * PARALLELISM_COUNT)
 
     async def test_shared_waitable(self) -> None:
-        @dataclass
-        class Flags:
-            ready: bool = False
-            processed: bool = False
-
         async def worker() -> None:
             async with door.write() as proxy:
-                await door.wait_for_write(lambda: proxy.ready)
+                while not proxy.ready:
+                    await door.wait_write()
 
                 proxy.processed = True
 
@@ -172,8 +175,9 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
         ):
             assert isinstance(primitive, SWaitable)
 
+            resource = self.Flags()
+            door = SWaitableDoor(resource, primitive)
             task = create_task(worker())
-            door = AsyncSWaitableDoor(Flags(), primitive)
 
             async with door.write() as proxy:
                 proxy.ready = True
@@ -181,7 +185,8 @@ class AsyncTestCase(IsolatedAsyncioTestCase):
                 await door.notify_write()
 
             async with door.read() as proxy:
-                await door.wait_for_read(lambda: proxy.processed)
+                while not proxy.processed:
+                    await door.wait_read()
 
                 self.assertTrue(proxy.processed)
 

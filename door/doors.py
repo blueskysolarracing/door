@@ -1,19 +1,42 @@
 """:mod:`door.doors` defines the doors."""
 
-from collections.abc import AsyncIterator, Callable, Iterator
+from abc import ABC
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, closing, contextmanager
-from dataclasses import dataclass
-from typing import Any, cast, Generic, TypeVar
+from dataclasses import dataclass, field
+from typing import cast, Generic, TypeVar
 
 from door.primitives import Acquirable, SAcquirable, SWaitable, Waitable
-from door.utilities import Proxy, await_if_awaitable
+from door.utilities import await_if_awaitable, Handle, Proxy
 
 _T = TypeVar('_T')
 
 
 @dataclass
-class AcquirableDoor(Generic[_T]):
+class Door(Generic[_T], ABC):
+    """The abstract base class for doors.
+
+    This class is designed to be used for threading, asynchronous
+    programming, and multiprocessing.
+    """
+
+    _resource_or_handle: _T | Handle[_T]
+
+    def _setup(self, mode: Proxy.Mode) -> Proxy[_T]:
+        return Proxy(self._resource_or_handle, mode)
+
+    def _close(self) -> None:
+        pass
+
+    def _open(self) -> None:
+        pass
+
+
+@dataclass
+class AcquirableDoor(Door[_T]):
     """The class for acquirable doors.
+
+    This class is designed to be used for threading and multiprocessing.
 
     The door is initialized with the resource and corresponding
     primitive.
@@ -25,7 +48,7 @@ class AcquirableDoor(Generic[_T]):
 
     >>> @dataclass
     ... class Resource:
-    ...     key: Any = 'value'
+    ...     key: str = 'value'
     ...
     >>> resource = Resource()
     >>> resource
@@ -33,9 +56,7 @@ class AcquirableDoor(Generic[_T]):
     >>> resource.key
     'value'
 
-    >>> from threading import Lock
-    >>> door = AcquirableDoor(resource, Lock())
-
+    >>> door = AcquirableDoor(resource)
     >>> with door() as proxy:
     ...     proxy.key
     ...     proxy.key = 'VALUE'
@@ -59,10 +80,7 @@ class AcquirableDoor(Generic[_T]):
     'VALUE'
     """
 
-    resource: _T
-    """The resource to be accessed."""
-    primitive: Acquirable
-    """The synchronization primitive."""
+    _primitive: Acquirable
 
     @contextmanager
     def __call__(self) -> Iterator[_T]:
@@ -73,19 +91,19 @@ class AcquirableDoor(Generic[_T]):
 
         :return: The context manager for the resource.
         """
-        self.primitive.acquire()
+        self._primitive.acquire()
 
         try:
-            resource = Proxy(self.resource, Proxy.Mode.READ | Proxy.Mode.WRITE)
+            proxy = self._setup(Proxy.Mode.READ | Proxy.Mode.WRITE)
 
-            with closing(resource):
-                yield cast(_T, resource)
+            with closing(proxy):
+                yield cast(_T, proxy)
         finally:
-            self.primitive.release()
+            self._primitive.release()
 
 
 @dataclass
-class AsyncAcquirableDoor(Generic[_T]):
+class AsyncAcquirableDoor(Door[_T]):
     """The class for asynchronous acquirable doors.
 
     This class is designed to be used for asynchronous prgramming.
@@ -99,10 +117,7 @@ class AsyncAcquirableDoor(Generic[_T]):
     raised.
     """
 
-    resource: _T
-    """The resource to be accessed."""
-    primitive: Acquirable
-    """The synchronization primitive."""
+    _primitive: Acquirable
 
     @asynccontextmanager
     async def __call__(self) -> AsyncIterator[_T]:
@@ -113,20 +128,22 @@ class AsyncAcquirableDoor(Generic[_T]):
 
         :return: The context manager for the resource.
         """
-        await await_if_awaitable(self.primitive.acquire())
+        await await_if_awaitable(self._primitive.acquire())
 
         try:
-            resource = Proxy(self.resource, Proxy.Mode.READ | Proxy.Mode.WRITE)
+            proxy = self._setup(Proxy.Mode.READ | Proxy.Mode.WRITE)
 
-            with closing(resource):
-                yield cast(_T, resource)
+            with closing(proxy):
+                yield cast(_T, proxy)
         finally:
-            await await_if_awaitable(self.primitive.release())
+            await await_if_awaitable(self._primitive.release())
 
 
 @dataclass
 class WaitableDoor(AcquirableDoor[_T]):
     """The class for waitable doors.
+
+    This class is designed to be used for threading and multiprocessing.
 
     The door is initialized with the resource and corresponding
     primitive.
@@ -137,35 +154,34 @@ class WaitableDoor(AcquirableDoor[_T]):
     be raised.
     """
 
-    primitive: Waitable
+    _primitive: Waitable
 
     def wait(self) -> None:
         """Wait.
 
         :return: ``None``.
         """
-        self.primitive.wait()
-
-    def wait_for(self, predicate: Callable[[], bool]) -> None:
-        """Wait for the predicate to hold ``True``.
-
-        :return: ``None``.
-        """
-        self.primitive.wait_for(predicate)
+        self._close()
+        self._primitive.wait()
+        self._open()
 
     def notify(self) -> None:
         """Notify one.
 
         :return: ``None``.
         """
-        self.primitive.notify()
+        self._close()
+        self._primitive.notify()
+        self._open()
 
     def notify_all(self) -> None:
         """Notify all.
 
         :return: ``None``.
         """
-        self.primitive.notify_all()
+        self._close()
+        self._primitive.notify_all()
+        self._open()
 
 
 @dataclass
@@ -183,40 +199,41 @@ class AsyncWaitableDoor(AsyncAcquirableDoor[_T]):
     raised.
     """
 
-    primitive: Waitable
+    _primitive: Waitable
 
     async def wait(self) -> None:
         """Wait.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.wait())
-
-    async def wait_for(self, predicate: Callable[[], Any]) -> None:
-        """Wait for the predicate to hold ``True``.
-
-        :return: ``None``.
-        """
-        await await_if_awaitable(self.primitive.wait_for(predicate))
+        self._close()
+        await await_if_awaitable(self._primitive.wait())
+        self._open()
 
     async def notify(self) -> None:
         """Notify one.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.notify())
+        self._close()
+        await await_if_awaitable(self._primitive.notify())
+        self._open()
 
     async def notify_all(self) -> None:
         """Notify all.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.notify_all())
+        self._close()
+        await await_if_awaitable(self._primitive.notify_all())
+        self._open()
 
 
 @dataclass
-class SAcquirableDoor(Generic[_T]):
+class SAcquirableDoor(Door[_T]):
     """The class for shared acquirable doors.
+
+    This class is designed to be used for threading and multiprocessing.
 
     The door is initialized with the resource and corresponding
     primitive.
@@ -228,7 +245,7 @@ class SAcquirableDoor(Generic[_T]):
 
     >>> @dataclass
     ... class Resource:
-    ...     key: Any = 'value'
+    ...     key: str = 'value'
     ...
     >>> resource = Resource()
     >>> resource
@@ -236,9 +253,7 @@ class SAcquirableDoor(Generic[_T]):
     >>> resource.key
     'value'
 
-    >>> from door.threading2 import RSLock
-    >>> door = SAcquirableDoor(resource, RSLock())
-
+    >>> door = SAcquirableDoor(resource)
     >>> with door.read() as proxy:
     ...     proxy.key
     ...
@@ -274,10 +289,7 @@ class SAcquirableDoor(Generic[_T]):
     'VALUE'
     """
 
-    resource: _T
-    """The resource to be accessed."""
-    primitive: SAcquirable
-    """The synchronization primitive."""
+    _primitive: SAcquirable
 
     @contextmanager
     def read(self) -> Iterator[_T]:
@@ -288,15 +300,15 @@ class SAcquirableDoor(Generic[_T]):
 
         :return: The context manager for the resource.
         """
-        self.primitive.acquire_read()
+        self._primitive.acquire_read()
 
         try:
-            resource = Proxy(self.resource, Proxy.Mode.READ)
+            proxy = self._setup(Proxy.Mode.READ)
 
-            with closing(resource):
-                yield cast(_T, resource)
+            with closing(proxy):
+                yield cast(_T, proxy)
         finally:
-            self.primitive.release_read()
+            self._primitive.release_read()
 
     @contextmanager
     def write(self) -> Iterator[_T]:
@@ -308,19 +320,19 @@ class SAcquirableDoor(Generic[_T]):
 
         :return: The context manager for the resource.
         """
-        self.primitive.acquire_write()
+        self._primitive.acquire_write()
 
         try:
-            resource = Proxy(self.resource, Proxy.Mode.READ | Proxy.Mode.WRITE)
+            proxy = self._setup(Proxy.Mode.READ | Proxy.Mode.WRITE)
 
-            with closing(resource):
-                yield cast(_T, resource)
+            with closing(proxy):
+                yield cast(_T, proxy)
         finally:
-            self.primitive.release_write()
+            self._primitive.release_write()
 
 
 @dataclass
-class AsyncSAcquirableDoor(Generic[_T]):
+class AsyncSAcquirableDoor(Door[_T]):
     """The class for asynchronous shared acquirable doors.
 
     This class is designed to be used for asynchronous prgramming.
@@ -334,10 +346,7 @@ class AsyncSAcquirableDoor(Generic[_T]):
     raised.
     """
 
-    resource: _T
-    """The resource to be accessed."""
-    primitive: SAcquirable
-    """The synchronization primitive."""
+    _primitive: SAcquirable
 
     @asynccontextmanager
     async def read(self) -> AsyncIterator[_T]:
@@ -349,15 +358,15 @@ class AsyncSAcquirableDoor(Generic[_T]):
 
         :return: The context manager for the resource.
         """
-        await await_if_awaitable(self.primitive.acquire_read())
+        await await_if_awaitable(self._primitive.acquire_read())
 
         try:
-            resource = Proxy(self.resource, Proxy.Mode.READ)
+            proxy = self._setup(Proxy.Mode.READ)
 
-            with closing(resource):
-                yield cast(_T, resource)
+            with closing(proxy):
+                yield cast(_T, proxy)
         finally:
-            await await_if_awaitable(self.primitive.release_read())
+            await await_if_awaitable(self._primitive.release_read())
 
     @asynccontextmanager
     async def write(self) -> AsyncIterator[_T]:
@@ -369,20 +378,22 @@ class AsyncSAcquirableDoor(Generic[_T]):
 
         :return: The context manager for the resource.
         """
-        await await_if_awaitable(self.primitive.acquire_write())
+        await await_if_awaitable(self._primitive.acquire_write())
 
         try:
-            resource = Proxy(self.resource, Proxy.Mode.READ | Proxy.Mode.WRITE)
+            proxy = self._setup(Proxy.Mode.READ | Proxy.Mode.WRITE)
 
-            with closing(resource):
-                yield cast(_T, resource)
+            with closing(proxy):
+                yield cast(_T, proxy)
         finally:
-            await await_if_awaitable(self.primitive.release_write())
+            await await_if_awaitable(self._primitive.release_write())
 
 
 @dataclass
 class SWaitableDoor(SAcquirableDoor[_T]):
     """The class for shared waitable doors.
+
+    This class is designed to be used for threading and multiprocessing.
 
     The door is initialized with the resource and corresponding
     primitive.
@@ -393,63 +404,61 @@ class SWaitableDoor(SAcquirableDoor[_T]):
     be raised.
     """
 
-    primitive: SWaitable
+    _primitive: SWaitable
 
     def wait_read(self) -> None:
         """Wait for reading.
 
         :return: ``None``.
         """
-        self.primitive.wait_read()
-
-    def wait_for_read(self, predicate: Callable[[], bool]) -> None:
-        """Wait for the predicate to hold ``True`` for reading.
-
-        :return: ``None``.
-        """
-        self.primitive.wait_for_read(predicate)
+        self._close()
+        self._primitive.wait_read()
+        self._open()
 
     def notify_read(self) -> None:
         """Notify one for reading.
 
         :return: ``None``.
         """
-        self.primitive.notify_read()
+        self._close()
+        self._primitive.notify_read()
+        self._open()
 
     def notify_all_read(self) -> None:
         """Notify all for reading.
 
         :return: ``None``.
         """
-        self.primitive.notify_all_read()
+        self._close()
+        self._primitive.notify_all_read()
+        self._open()
 
     def wait_write(self) -> None:
         """Wait for writing.
 
         :return: ``None``.
         """
-        self.primitive.wait_write()
-
-    def wait_for_write(self, predicate: Callable[[], bool]) -> None:
-        """Wait for the predicate to hold ``True`` for writing.
-
-        :return: ``None``.
-        """
-        self.primitive.wait_for_write(predicate)
+        self._close()
+        self._primitive.wait_write()
+        self._open()
 
     def notify_write(self) -> None:
         """Notify one for writing.
 
         :return: ``None``.
         """
-        self.primitive.notify_write()
+        self._close()
+        self._primitive.notify_write()
+        self._open()
 
     def notify_all_write(self) -> None:
         """Notify all for writing.
 
         :return: ``None``.
         """
-        self.primitive.notify_all_write()
+        self._close()
+        self._primitive.notify_all_write()
+        self._open()
 
 
 @dataclass
@@ -467,60 +476,94 @@ class AsyncSWaitableDoor(AsyncSAcquirableDoor[_T]):
     raised.
     """
 
-    primitive: SWaitable
+    _primitive: SWaitable
 
     async def wait_read(self) -> None:
         """Wait for reading.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.wait_read())
-
-    async def wait_for_read(self, predicate: Callable[[], Any]) -> None:
-        """Wait for the predicate to hold ``True`` for reading.
-
-        :return: ``None``.
-        """
-        await await_if_awaitable(self.primitive.wait_for_read(predicate))
+        self._close()
+        await await_if_awaitable(self._primitive.wait_read())
+        self._open()
 
     async def notify_read(self) -> None:
         """Notify one for reading.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.notify_read())
+        self._close()
+        await await_if_awaitable(self._primitive.notify_read())
+        self._open()
 
     async def notify_all_read(self) -> None:
         """Notify all for reading.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.notify_all_read())
+        self._close()
+        await await_if_awaitable(self._primitive.notify_all_read())
+        self._open()
 
     async def wait_write(self) -> None:
         """Wait for writing.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.wait_write())
-
-    async def wait_for_write(self, predicate: Callable[[], Any]) -> None:
-        """Wait for the predicate to hold ``True`` for writing.
-
-        :return: ``None``.
-        """
-        await await_if_awaitable(self.primitive.wait_for_write(predicate))
+        self._close()
+        await await_if_awaitable(self._primitive.wait_write())
+        self._open()
 
     async def notify_write(self) -> None:
         """Notify one for writing.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.notify_write())
+        self._close()
+        await await_if_awaitable(self._primitive.notify_write())
+        self._open()
 
     async def notify_all_write(self) -> None:
         """Notify all for writing.
 
         :return: ``None``.
         """
-        await await_if_awaitable(self.primitive.notify_all_write())
+        self._close()
+        await await_if_awaitable(self._primitive.notify_all_write())
+        self._open()
+
+
+class UnhandledDoor(Door[_T], ABC):
+    """The abstract base class for unhandled doors.
+
+    This class is designed to be used for threading and asynchronous
+    prgramming.
+    """
+
+    def __post_init__(self) -> None:
+        if isinstance(self._resource_or_handle, Handle):
+            raise ValueError('handle used')
+
+
+class HandledDoor(Door[_T], ABC):
+    """The abstract base class for handled doors.
+
+    This class is designed to be used for multiprocessing.
+    """
+
+    _proxy: Proxy[_T] = field(init=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self._resource_or_handle, Handle):
+            raise ValueError('handle not used')
+
+    def _setup(self, mode: Proxy.Mode) -> Proxy[_T]:
+        self._proxy = super()._setup(mode)
+
+        return self._proxy
+
+    def _close(self) -> None:
+        self._proxy.close()
+
+    def _open(self) -> None:
+        self._proxy.open()

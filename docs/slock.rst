@@ -21,9 +21,14 @@ functionalities of shared locks. Therefore, for
 We offer implementations for both synchronous and asynchronous programming.
 These classes of shared locks are available, for different use cases:
 
+Read-preferring:
+
 - :class:`door.threading2.RSLock` for multithreading.
 - :class:`door.multiprocessing2.RSLock` for multiprocessing.
 - :class:`door.asyncio2.RSLock` for asynchronous programming.
+
+Write-preferring:
+
 - :class:`door.threading2.WSLock` for multithreading.
 - :class:`door.multiprocessing2.WSLock` for multiprocessing.
 - :class:`door.asyncio2.WSLock` for asynchronous programming.

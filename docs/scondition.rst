@@ -26,9 +26,14 @@ functionalities of shared conditions. Therefore, for
 We offer implementations for both synchronous and asynchronous programming.
 These classes of shared conditions are available, for different use cases:
 
+Read-preferring:
+
 - :class:`door.threading2.RSCondition` for multithreading.
 - :class:`door.multiprocessing2.RSCondition` for multiprocessing.
 - :class:`door.asyncio2.RSCondition` for asynchronous programming.
+
+Write-preferring:
+
 - :class:`door.threading2.WSCondition` for multithreading.
 - :class:`door.multiprocessing2.WSCondition` for multiprocessing.
 - :class:`door.asyncio2.WSCondition` for asynchronous programming.

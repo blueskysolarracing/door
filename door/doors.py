@@ -56,6 +56,7 @@ class AcquirableDoor(Door[_T]):
     >>> resource.key
     'value'
 
+    >>> from door.threading2 import AcquirableDoor
     >>> door = AcquirableDoor(resource)
     >>> with door() as proxy:
     ...     proxy.key
@@ -253,6 +254,7 @@ class SAcquirableDoor(Door[_T]):
     >>> resource.key
     'value'
 
+    >>> from door.threading2 import SAcquirableDoor
     >>> door = SAcquirableDoor(resource)
     >>> with door.read() as proxy:
     ...     proxy.key

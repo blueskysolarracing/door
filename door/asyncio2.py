@@ -6,9 +6,9 @@ from typing import TypeVar
 
 from door.doors import (
     AsyncAcquirableDoor,
-    AsyncWaitableDoor,
     AsyncSAcquirableDoor,
     AsyncSWaitableDoor,
+    AsyncWaitableDoor,
     UnhandledDoor,
 )
 from door.primitives import (

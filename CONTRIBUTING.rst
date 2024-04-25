@@ -28,10 +28,11 @@ When making changes, please follow these guidelines:
 - Document your changes in the code and update the README file if necessary.
 - After making changes, please validate your changes.
 
-1. Run static type checking with ``--strict`` flag: ``mypy --strict door``
-2. Run style checking: ``flake8 door``
-3. Run unit tests: ``python -m unittest``
-4. Run doctests: ``python -m doctest door/*.py``
+1. Run style checking: ``flake8 door``
+2. Run static type checking with ``--strict`` flag: ``mypy --strict door``
+3. Run checks for missing docstrings: ``interrogate -f 100 -i -m -n -p -s -r '^\w+TestCase' door``
+4. Run unit tests: ``python -m unittest``
+5. Run doctests: ``python -m doctest door/*.py``
 
 Submitting a Pull Request
 -------------------------

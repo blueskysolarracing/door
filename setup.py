@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='door',
-    version='0.0.3',
+    version='0.0.4',
     description='A comprehensive python library for synchronization proxies',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',

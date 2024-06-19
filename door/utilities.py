@@ -239,7 +239,7 @@ class Proxy(Generic[_T]):
     resource_or_handle: InitVar[_T | Handle[_T]]
     """The resource or handle."""
     __mode: Mode
-    __resource: _T = field(init=False)
+    _resource: _T = field(init=False)
     __handle: Handle[_T] | None = field(init=False)
     __status: bool = field(default=False, init=False)
 
@@ -247,7 +247,7 @@ class Proxy(Generic[_T]):
         if isinstance(resource_or_handle, Handle):
             self.__handle = resource_or_handle
         else:
-            self.__resource = resource_or_handle
+            self._resource = resource_or_handle
             self.__handle = None
 
         self.open()
@@ -255,10 +255,10 @@ class Proxy(Generic[_T]):
         self.__initialized = True
 
     def __repr__(self) -> str:
-        return repr(self.__resource)
+        return repr(self._resource)
 
     def __eq__(self, other: object) -> bool:
-        return self.__resource == other
+        return self._resource == other
 
     def __getattr__(self, name: str) -> Any:
         if not self.__initialized:
@@ -270,7 +270,7 @@ class Proxy(Generic[_T]):
             if not self.__status or self.Mode.READ not in self.__mode:
                 raise ValueError('no read permission')
 
-            value = getattr(self.__resource, name)
+            value = getattr(self._resource, name)
 
             if isinstance(value, MethodType):
                 value = partial(value.__func__, self)
@@ -289,7 +289,7 @@ class Proxy(Generic[_T]):
             if not self.__status or self.Mode.WRITE not in self.__mode:
                 raise ValueError('no write permission')
 
-            setattr(self.__resource, name, value)
+            setattr(self._resource, name, value)
         else:
             super().__setattr__(name, value)
 
@@ -299,7 +299,7 @@ class Proxy(Generic[_T]):
         :return: ``None``.
         """
         if self.__handle is not None:
-            self.__resource = self.__handle.get()
+            self._resource = self.__handle.get()
 
         self.__status = True
 
@@ -309,7 +309,7 @@ class Proxy(Generic[_T]):
         :return: ``None``.
         """
         if self.__handle is not None and self.Mode.WRITE in self.__mode:
-            self.__handle.set(self.__resource)
+            self.__handle.set(self._resource)
 
         self.__status = False
 

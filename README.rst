@@ -6,7 +6,6 @@ Door is a comprehensive python library for synchronization proxies. Door's
 reliability has been established through static type checking, extensive
 doctests, and unit tests, achieving 93% code coverage.
 
-
 Features
 --------
 
